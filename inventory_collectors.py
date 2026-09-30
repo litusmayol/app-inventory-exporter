@@ -131,3 +131,86 @@ def _read_registry_value(registry_module, key, value_name):
         return ""
 
     return str(value)
+
+
+def collect_macos_applications(
+    application_directories=None,
+    filesystem_module=None,
+    plist_module=None,
+    home_directory=None,
+):
+    """Return macOS .app bundles with basic bundle metadata."""
+
+    if application_directories is None:
+        home = home_directory or __import__("pathlib").Path.home()
+        application_directories = (
+            __import__("pathlib").Path("/Applications"),
+            __import__("pathlib").Path("/System/Applications"),
+            home / "Applications",
+        )
+
+    if filesystem_module is None:
+        import os as filesystem_module
+
+    if plist_module is None:
+        import plistlib as plist_module
+
+    applications = []
+
+    for directory in application_directories:
+        if not filesystem_module.path.isdir(directory):
+            continue
+
+        try:
+            entries = filesystem_module.listdir(directory)
+        except OSError:
+            continue
+
+        for entry in entries:
+            if not entry.endswith(".app"):
+                continue
+
+            app_path = filesystem_module.path.join(directory, entry)
+            if not filesystem_module.path.isdir(app_path):
+                continue
+
+            info_path = filesystem_module.path.join(
+                app_path,
+                "Contents",
+                "Info.plist",
+            )
+
+            metadata = {}
+            try:
+                with open(info_path, "rb") as info_file:
+                    metadata = plist_module.load(info_file)
+            except (OSError, ValueError, plist_module.InvalidFileException):
+                metadata = {}
+
+            name = (
+                metadata.get("CFBundleDisplayName")
+                or metadata.get("CFBundleName")
+                or entry.removesuffix(".app")
+            )
+
+            version = (
+                metadata.get("CFBundleShortVersionString")
+                or metadata.get("CFBundleVersion")
+                or ""
+            )
+
+            applications.append(
+                {
+                    "name": str(name),
+                    "version": str(version),
+                    "publisher": "",
+                    "install_location": str(app_path),
+                    "bundle_identifier": str(
+                        metadata.get("CFBundleIdentifier", "")
+                    ),
+                    "source": "macOS Application Bundle",
+                }
+            )
+
+    applications.sort(key=lambda item: item["name"].casefold())
+    return applications

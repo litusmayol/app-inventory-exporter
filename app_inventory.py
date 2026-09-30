@@ -7,7 +7,10 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import datetime
 
-from inventory_collectors import collect_windows_applications
+from inventory_collectors import (
+    collect_macos_applications,
+    collect_windows_applications,
+)
 
 CONFIG_FILE = os.path.expanduser("~/.app_inventory_config.json")
 
@@ -244,11 +247,38 @@ class AppInventoryGUI:
                 pass
 
         elif system == "Darwin":
-            apps_dir = "/Applications"
-            if os.path.exists(apps_dir):
-                for app in os.listdir(apps_dir):
-                    if app.endswith(".app"):
-                        md_lines.append(f"| App macOS | /Applications | {app.replace('.app', '')} | Aplicació instal·lada a macOS |")
+            macos_applications = collect_macos_applications()
+
+            if not macos_applications:
+                md_lines.append(
+                    "| App macOS | Sistema | No s'han trobat aplicacions | - |"
+                )
+            else:
+                for application in macos_applications:
+                    name = application["name"].replace("|", "-")
+                    version = application["version"].replace("|", "-")
+                    location = application["install_location"].replace("|", "-")
+                    bundle_identifier = application[
+                        "bundle_identifier"
+                    ].replace("|", "-")
+
+                    description_parts = []
+
+                    if version:
+                        description_parts.append(f"Versió: {version}")
+
+                    if bundle_identifier:
+                        description_parts.append(
+                            f"Identificador: {bundle_identifier}"
+                        )
+
+                    description_parts.append(f"Ubicació: {location}")
+                    description = "; ".join(description_parts)
+
+                    md_lines.append(
+                        f"| App macOS | Application Bundle | {name} | "
+                        f"{description} |"
+                    )
 
         elif system == "Windows":
             windows_applications = collect_windows_applications()

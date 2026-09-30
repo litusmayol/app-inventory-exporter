@@ -66,21 +66,31 @@ def test_windows_branch_formats_collector_results():
     assert "Editor: Example Ltd" in content
 
 
-def test_macos_branch_lists_app_bundles_from_applications():
+def test_macos_branch_formats_collector_results():
     app = create_app_object()
 
+    applications = [
+        {
+            "name": "Safari",
+            "version": "18.0",
+            "publisher": "",
+            "install_location": "/Applications/Safari.app",
+            "bundle_identifier": "com.apple.Safari",
+            "source": "macOS Application Bundle",
+        }
+    ]
+
     with patch.object(app_inventory.platform, "system", return_value="Darwin"), \
-         patch.object(app_inventory.os.path, "exists", return_value=True), \
          patch.object(
-             app_inventory.os,
-             "listdir",
-             return_value=["Safari.app", "Notes.app", "readme.txt"],
+             app_inventory,
+             "collect_macos_applications",
+             return_value=applications,
          ):
         content = app.generate_markdown_content()
 
-    assert "| App macOS | /Applications | Safari |" in content
-    assert "| App macOS | /Applications | Notes |" in content
-    assert "readme.txt" not in content
+    assert "| App macOS | Application Bundle | Safari |" in content
+    assert "Versió: 18.0" in content
+    assert "Identificador: com.apple.Safari" in content
 
 
 def test_linux_branch_collects_apt_packages():
@@ -216,4 +226,41 @@ def test_windows_collector_reads_installed_applications():
             "install_location": "",
             "source": "Windows Registry",
         },
+    ]
+
+
+def test_macos_collector_reads_bundle_metadata(tmp_path):
+    from inventory_collectors import collect_macos_applications
+
+    applications_directory = tmp_path / "Applications"
+    application_bundle = applications_directory / "Example.app"
+    contents_directory = application_bundle / "Contents"
+    contents_directory.mkdir(parents=True)
+
+    plist_path = contents_directory / "Info.plist"
+
+    import plistlib
+
+    plist_data = {
+        "CFBundleDisplayName": "Example Application",
+        "CFBundleShortVersionString": "3.2.1",
+        "CFBundleIdentifier": "com.example.application",
+    }
+
+    with plist_path.open("wb") as plist_file:
+        plistlib.dump(plist_data, plist_file)
+
+    applications = collect_macos_applications(
+        application_directories=(applications_directory,)
+    )
+
+    assert applications == [
+        {
+            "name": "Example Application",
+            "version": "3.2.1",
+            "publisher": "",
+            "install_location": str(application_bundle),
+            "bundle_identifier": "com.example.application",
+            "source": "macOS Application Bundle",
+        }
     ]

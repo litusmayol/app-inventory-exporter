@@ -40,14 +40,30 @@ def create_app_object():
     return object.__new__(app_inventory.AppInventoryGUI)
 
 
-def test_windows_branch_currently_returns_placeholder_row():
+def test_windows_branch_formats_collector_results():
     app = create_app_object()
 
-    with patch.object(app_inventory.platform, "system", return_value="Windows"):
+    applications = [
+        {
+            "name": "Example App",
+            "version": "2.5.0",
+            "publisher": "Example Ltd",
+            "install_location": r"C:\\Program Files\\Example App",
+            "source": "Windows Registry",
+        }
+    ]
+
+    with patch.object(app_inventory.platform, "system", return_value="Windows"), \
+         patch.object(
+             app_inventory,
+             "collect_windows_applications",
+             return_value=applications,
+         ):
         content = app.generate_markdown_content()
 
-    assert "| Windows |" in content
-    assert "Programari Windows" in content
+    assert "| Windows | Registry | Example App |" in content
+    assert "Versió: 2.5.0" in content
+    assert "Editor: Example Ltd" in content
 
 
 def test_macos_branch_lists_app_bundles_from_applications():
@@ -97,7 +113,12 @@ def test_linux_branch_collects_apt_packages():
 def test_generated_content_contains_markdown_table():
     app = create_app_object()
 
-    with patch.object(app_inventory.platform, "system", return_value="Windows"):
+    with patch.object(app_inventory.platform, "system", return_value="Windows"), \
+         patch.object(
+             app_inventory,
+             "collect_windows_applications",
+             return_value=[],
+         ):
         content = app.generate_markdown_content()
 
     assert "| Tipus | Data / Font | Nom | Descripció |" in content

@@ -7,6 +7,8 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import datetime
 
+from inventory_collectors import collect_windows_applications
+
 CONFIG_FILE = os.path.expanduser("~/.app_inventory_config.json")
 
 # Diccionario de traducciones
@@ -249,7 +251,37 @@ class AppInventoryGUI:
                         md_lines.append(f"| App macOS | /Applications | {app.replace('.app', '')} | Aplicació instal·lada a macOS |")
 
         elif system == "Windows":
-            md_lines.append("| Windows | Sistema | Programari Windows | Consultat via interfície |")
+            windows_applications = collect_windows_applications()
+
+            if not windows_applications:
+                md_lines.append(
+                    "| Windows | Registry | No s'han trobat aplicacions | - |"
+                )
+            else:
+                for application in windows_applications:
+                    name = application["name"].replace("|", "-")
+                    version = application["version"].replace("|", "-")
+                    publisher = application["publisher"].replace("|", "-")
+                    description_parts = []
+
+                    if version:
+                        description_parts.append(f"Versió: {version}")
+
+                    if publisher:
+                        description_parts.append(f"Editor: {publisher}")
+
+                    if application["install_location"]:
+                        description_parts.append(
+                            f"Ubicació: {application['install_location']}"
+                        )
+
+                    description = "; ".join(description_parts) or "-"
+                    description = description.replace("|", "-")
+
+                    md_lines.append(
+                        f"| Windows | Registry | {name} | "
+                        f"{description} |"
+                    )
 
         return "\n".join(md_lines)
 

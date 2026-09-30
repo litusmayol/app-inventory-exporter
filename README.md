@@ -1,4 +1,4 @@
-# App Inventory Exporter to Markdown 📝
+# App Inventory Exporter
 
 [ English ] | [ Català ]
 

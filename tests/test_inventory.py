@@ -314,3 +314,27 @@ def test_headless_export_writes_active_destinations(tmp_path):
     assert (first_directory / "first-export.md").exists()
     assert (second_directory / "second-export.md").exists()
     assert not inactive_directory.exists()
+
+
+def test_frequency_labels_convert_to_canonical_keys():
+    assert app_inventory.frequency_key_from_value("Manual") == "manual"
+    assert app_inventory.frequency_key_from_value("Cada hora") == "hourly"
+    assert app_inventory.frequency_key_from_value("Every 6 hours") == "six_hourly"
+    assert app_inventory.frequency_key_from_value("Diario") == "daily"
+    assert (
+        app_inventory.frequency_key_from_value("On system startup")
+        == "startup"
+    )
+
+
+def test_frequency_labels_are_translated_from_canonical_keys():
+    assert app_inventory.frequency_label_for("Català", "hourly") == "Cada hora"
+    assert app_inventory.frequency_label_for("English", "daily") == "Daily"
+    assert (
+        app_inventory.frequency_label_for("Español", "startup")
+        == "Al iniciar el sistema"
+    )
+
+
+def test_unknown_frequency_defaults_to_manual():
+    assert app_inventory.frequency_key_from_value("unknown") == "manual"

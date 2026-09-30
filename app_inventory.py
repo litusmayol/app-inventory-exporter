@@ -69,6 +69,58 @@ TRANSLATIONS = {
     }
 }
 
+FREQUENCY_KEYS = (
+    "manual",
+    "hourly",
+    "six_hourly",
+    "daily",
+    "startup",
+)
+
+FREQUENCY_LABELS = {
+    "Català": {
+        "manual": "Manual",
+        "hourly": "Cada hora",
+        "six_hourly": "Cada 6 hores",
+        "daily": "Diari",
+        "startup": "En iniciar el sistema",
+    },
+    "English": {
+        "manual": "Manual",
+        "hourly": "Every hour",
+        "six_hourly": "Every 6 hours",
+        "daily": "Daily",
+        "startup": "On system startup",
+    },
+    "Español": {
+        "manual": "Manual",
+        "hourly": "Cada hora",
+        "six_hourly": "Cada 6 horas",
+        "daily": "Diario",
+        "startup": "Al iniciar el sistema",
+    },
+}
+
+
+def frequency_key_from_value(value):
+    """Convert a canonical key or translated legacy label to a key."""
+    if value in FREQUENCY_KEYS:
+        return value
+
+    for labels in FREQUENCY_LABELS.values():
+        for key, label in labels.items():
+            if value == label:
+                return key
+
+    return "manual"
+
+
+def frequency_label_for(language, key):
+    """Return the translated GUI label for a canonical frequency key."""
+    labels = FREQUENCY_LABELS.get(language, FREQUENCY_LABELS["Català"])
+    return labels.get(key, labels["manual"])
+
+
 class AppInventoryGUI:
     def __init__(self, root):
         self.root = root
@@ -106,9 +158,18 @@ class AppInventoryGUI:
         self.lbl_freq = ttk.Label(self.freq_frame, text=t["freq_label"])
         self.lbl_freq.grid(row=0, column=0, sticky="w", padx=5)
         
-        self.freq_var = tk.StringVar(value=self.saved_config.get("frequency", t["freq_options"][0]))
-        self.freq_combo = ttk.Combobox(self.freq_frame, textvariable=self.freq_var, state="readonly", 
-                                       values=t["freq_options"])
+        saved_frequency = frequency_key_from_value(
+            self.saved_config.get("frequency", "manual")
+        )
+        self.freq_var = tk.StringVar(
+            value=frequency_label_for(self.current_lang, saved_frequency)
+        )
+        self.freq_combo = ttk.Combobox(
+            self.freq_frame,
+            textvariable=self.freq_var,
+            state="readonly",
+            values=t["freq_options"],
+        )
         self.freq_combo.grid(row=0, column=1, sticky="w", padx=5)
 
         # --- Frame de Destinos (Hasta 5) ---
@@ -161,6 +222,7 @@ class AppInventoryGUI:
         self.btn_run.pack(side="right", padx=5)
 
     def change_language(self, event=None):
+        selected_frequency = frequency_key_from_value(self.freq_var.get())
         self.current_lang = self.lang_var.get()
         t = TRANSLATIONS[self.current_lang]
 
@@ -168,6 +230,9 @@ class AppInventoryGUI:
         self.freq_frame.config(text=t["freq_title"])
         self.lbl_freq.config(text=t["freq_label"])
         self.freq_combo.config(values=t["freq_options"])
+        self.freq_var.set(
+            frequency_label_for(self.current_lang, selected_frequency)
+        )
         
         self.dest_frame.config(text=t["dest_title"])
         self.lbl_act.config(text=t["active"])
@@ -198,7 +263,7 @@ class AppInventoryGUI:
     def save_config(self):
         config_data = {
             "language": self.current_lang,
-            "frequency": self.freq_var.get(),
+            "frequency": frequency_key_from_value(self.freq_var.get()),
             "destinations": [
                 {
                     "active": item["active"].get(),

@@ -264,3 +264,53 @@ def test_macos_collector_reads_bundle_metadata(tmp_path):
             "source": "macOS Application Bundle",
         }
     ]
+
+
+def test_headless_export_writes_active_destinations(tmp_path):
+    import json
+
+    first_directory = tmp_path / "first"
+    second_directory = tmp_path / "second"
+    inactive_directory = tmp_path / "inactive"
+
+    config_path = tmp_path / "config.json"
+    config_data = {
+        "destinations": [
+            {
+                "active": True,
+                "dir": str(first_directory),
+                "file": "first-export",
+            },
+            {
+                "active": True,
+                "dir": str(second_directory),
+                "file": "second-export.md",
+            },
+            {
+                "active": False,
+                "dir": str(inactive_directory),
+                "file": "inactive.md",
+            },
+        ]
+    }
+
+    config_path.write_text(
+        json.dumps(config_data),
+        encoding="utf-8",
+    )
+
+    with patch.object(
+        app_inventory.platform,
+        "system",
+        return_value="Windows",
+    ), patch.object(
+        app_inventory,
+        "collect_windows_applications",
+        return_value=[],
+    ):
+        written_count = app_inventory.export_from_config(config_path)
+
+    assert written_count == 2
+    assert (first_directory / "first-export.md").exists()
+    assert (second_directory / "second-export.md").exists()
+    assert not inactive_directory.exists()

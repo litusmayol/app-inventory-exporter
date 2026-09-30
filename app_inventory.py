@@ -343,7 +343,63 @@ class AppInventoryGUI:
         else:
             messagebox.showwarning(t["title"], t["warning_msg"])
 
+
+def export_from_config(config_path=CONFIG_FILE):
+    """Generate Markdown and write all active configured destinations.
+
+    Returns the number of files successfully written.
+    Raises ValueError for invalid configuration and OSError for file errors.
+    """
+    with open(config_path, "r", encoding="utf-8") as config_file:
+        config_data = json.load(config_file)
+
+    app = object.__new__(AppInventoryGUI)
+    content = app.generate_markdown_content()
+    destinations = config_data.get("destinations", [])
+
+    written_count = 0
+
+    for destination in destinations:
+        if not destination.get("active", False):
+            continue
+
+        target_dir = str(destination.get("dir", "")).strip()
+        filename = str(destination.get("file", "")).strip()
+
+        if not target_dir or not filename:
+            continue
+
+        if not filename.lower().endswith(".md"):
+            filename = f"{filename}.md"
+
+        os.makedirs(target_dir, exist_ok=True)
+
+        output_path = os.path.join(target_dir, filename)
+        with open(output_path, "w", encoding="utf-8") as output_file:
+            output_file.write(content)
+
+        written_count += 1
+
+    return written_count
+
 if __name__ == "__main__":
+    if "--export" in sys.argv:
+        try:
+            exported_count = export_from_config()
+        except FileNotFoundError:
+            print(f"Configuration file not found: {CONFIG_FILE}", file=sys.stderr)
+            sys.exit(1)
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            print(f"Export failed: {error}", file=sys.stderr)
+            sys.exit(1)
+
+        if exported_count == 0:
+            print("No active export destinations were found.", file=sys.stderr)
+            sys.exit(1)
+
+        print(f"Exported {exported_count} Markdown file(s).")
+        sys.exit(0)
+
     root = tk.Tk()
     app = AppInventoryGUI(root)
     root.mainloop()

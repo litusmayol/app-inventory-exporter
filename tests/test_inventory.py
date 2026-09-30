@@ -25,7 +25,10 @@ sys.modules.setdefault("tkinter.filedialog", filedialog_stub)
 sys.modules.setdefault("tkinter.messagebox", messagebox_stub)
 
 
-MODULE_PATH = Path(__file__).parents[1] / "app_inventory.py"
+PROJECT_ROOT = Path(__file__).parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
+
+MODULE_PATH = PROJECT_ROOT / "app_inventory.py"
 
 spec = importlib.util.spec_from_file_location("app_inventory", MODULE_PATH)
 app_inventory = importlib.util.module_from_spec(spec)
@@ -99,3 +102,97 @@ def test_generated_content_contains_markdown_table():
 
     assert "| Tipus | Data / Font | Nom | Descripció |" in content
     assert content.startswith("# Llistat d'aplicacions")
+
+
+class FakeRegistryKey:
+    def __init__(self, values=None, subkeys=None):
+        self.values = values or {}
+        self.subkeys = subkeys or {}
+
+
+class FakeRegistry:
+    HKEY_CURRENT_USER = "HKEY_CURRENT_USER"
+    HKEY_LOCAL_MACHINE = "HKEY_LOCAL_MACHINE"
+    KEY_READ = 1
+
+    def __init__(self):
+        uninstall_path = (
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
+        )
+
+        self.roots = {
+            self.HKEY_CURRENT_USER: FakeRegistryKey(),
+            self.HKEY_LOCAL_MACHINE: FakeRegistryKey(
+                subkeys={
+                    uninstall_path: FakeRegistryKey(
+                        subkeys={
+                            "ExampleApp": FakeRegistryKey(
+                                values={
+                                    "DisplayName": "Example App",
+                                    "DisplayVersion": "2.5.0",
+                                    "Publisher": "Example Ltd",
+                                    "InstallLocation": (
+                                        r"C:\Program Files\Example App"
+                                    ),
+                                }
+                            ),
+                            "SecondApp": FakeRegistryKey(
+                                values={
+                                    "DisplayName": "Second App",
+                                    "DisplayVersion": "1.0",
+                                    "Publisher": "Another Ltd",
+                                }
+                            ),
+                        }
+                    )
+                }
+            ),
+        }
+
+    def OpenKey(self, root_or_key, path, reserved=0, access=0):
+        try:
+            if isinstance(root_or_key, FakeRegistryKey):
+                return root_or_key.subkeys[path]
+
+            return self.roots[root_or_key].subkeys[path]
+        except KeyError as error:
+            raise OSError from error
+
+    def QueryInfoKey(self, key):
+        return (len(key.subkeys), 0, 0)
+
+    def EnumKey(self, key, index):
+        return list(key.subkeys.keys())[index]
+
+    def QueryValueEx(self, key, value_name):
+        if value_name not in key.values:
+            raise OSError
+
+        return key.values[value_name], None
+
+    def CloseKey(self, key):
+        return None
+
+
+def test_windows_collector_reads_installed_applications():
+    from inventory_collectors import collect_windows_applications
+
+    registry = FakeRegistry()
+    applications = collect_windows_applications(registry_module=registry)
+
+    assert applications == [
+        {
+            "name": "Example App",
+            "version": "2.5.0",
+            "publisher": "Example Ltd",
+            "install_location": r"C:\Program Files\Example App",
+            "source": "Windows Registry",
+        },
+        {
+            "name": "Second App",
+            "version": "1.0",
+            "publisher": "Another Ltd",
+            "install_location": "",
+            "source": "Windows Registry",
+        },
+    ]

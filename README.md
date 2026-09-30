@@ -21,11 +21,11 @@ A cross-platform GUI application (Linux, macOS, Windows) to export the list of i
 Aplicació GUI multiplataforma (Linux, macOS, Windows) per exportar el llistat d'aplicacions i extensions instal·lades al teu sistema en format Markdown (.md).
 
 ## Funcionalitats
--**Multiplataforma:** Compatible amb Linux, macOS i Windows.
--**Interfície Gràfica:** Desenvolupada amb Tkinter.
--**Freqüència Configurable:** Permet definir la freqüència d'execució.
--**Múltiples Destins:** Genera fins a 5 còpies sincronitzades en diferents rutes o unitats de xarxa (SMB).
--**Gestors de Paquets Suportats:** Detecta paquets APT, Snaps i extensions GNOME a sistemes Linux.
+- **Multiplataforma:** Compatible amb Linux, macOS i Windows.
+- **Interfície Gràfica:** Desenvolupada amb Tkinter.
+- **Freqüència Configurable:** Permet definir la freqüència d'execució.
+- **Múltiples Destins:** Genera fins a 5 còpies sincronitzades en diferents rutes o unitats de xarxa (SMB).
+- **Gestors de Paquets Suportats:** Detecta paquets APT, Snaps i extensions GNOME a sistemes Linux.
 
 ---
 

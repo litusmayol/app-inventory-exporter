@@ -12,6 +12,7 @@ from inventory_collectors import (
     collect_windows_applications,
 )
 from linux_scheduler import configure_linux_scheduler
+from windows_scheduler import configure_windows_scheduler
 
 CONFIG_FILE = os.path.expanduser("~/.app_inventory_config.json")
 
@@ -123,20 +124,26 @@ def frequency_label_for(language, key):
 
 
 def configure_scheduler_for_frequency(frequency):
-    """Write the scheduler configuration for the current platform.
+    """Configure the native scheduler for the current platform."""
+    canonical_frequency = frequency_key_from_value(frequency)
+    current_platform = platform.system()
 
-    The timer is deliberately not activated yet. This first integration
-    creates or removes the Linux unit files so they can be inspected safely.
-    """
-    if platform.system() != "Linux":
-        return None
+    if current_platform == "Linux":
+        return configure_linux_scheduler(
+            frequency=canonical_frequency,
+            application_path=os.path.abspath(__file__),
+            python_executable=sys.executable,
+            activate=True,
+        )
 
-    return configure_linux_scheduler(
-        frequency=frequency_key_from_value(frequency),
-        application_path=os.path.abspath(__file__),
-        python_executable=sys.executable,
-        activate=False,
-    )
+    if current_platform == "Windows":
+        return configure_windows_scheduler(
+            frequency=canonical_frequency,
+            application_path=os.path.abspath(__file__),
+            python_executable=sys.executable,
+        )
+
+    return None
 
 
 class AppInventoryGUI:

@@ -407,18 +407,137 @@ def test_scheduler_wrapper_uses_canonical_frequency(tmp_path):
         frequency="six_hourly",
         application_path=app_inventory.os.path.abspath(app_inventory.__file__),
         python_executable=app_inventory.sys.executable,
-        activate=False,
+        activate=True,
     )
     assert result["timer"].name == "app-inventory-exporter.timer"
 
 
-def test_scheduler_wrapper_does_nothing_on_non_linux():
+def test_scheduler_wrapper_keeps_macos_without_scheduler_legacy():
+    with patch.object(
+        app_inventory.platform,
+        "system",
+        return_value="Darwin",
+    ), patch.object(
+        app_inventory,
+        "configure_linux_scheduler",
+    ) as linux_scheduler, patch.object(
+        app_inventory,
+        "configure_windows_scheduler",
+    ) as windows_scheduler:
+        result = app_inventory.configure_scheduler_for_frequency("hourly")
+
+    assert result is None
+    linux_scheduler.assert_not_called()
+    windows_scheduler.assert_not_called()
+
+
+def test_windows_scheduler_builds_hourly_task_command(tmp_path):
+    from windows_scheduler import build_schtasks_create_command
+
+    command = build_schtasks_create_command(
+        frequency="hourly",
+        application_path=tmp_path / "app_inventory.py",
+        python_executable=tmp_path / "python.exe",
+    )
+
+    assert command[:4] == [
+        "schtasks.exe",
+        "/Create",
+        "/TN",
+        "App Inventory Exporter",
+    ]
+    assert "/SC" in command
+    assert command[command.index("/SC") + 1] == "HOURLY"
+    assert command[command.index("/MO") + 1] == "1"
+    assert "--export" in command[command.index("/TR") + 1]
+
+
+def test_windows_scheduler_builds_startup_task_command(tmp_path):
+    from windows_scheduler import build_schtasks_create_command
+
+    command = build_schtasks_create_command(
+        frequency="startup",
+        application_path=tmp_path / "app_inventory.py",
+        python_executable=tmp_path / "python.exe",
+    )
+
+    assert command[command.index("/SC") + 1] == "ONSTART"
+    assert "/MO" not in command
+
+
+def test_windows_scheduler_deletes_manual_task():
+    from windows_scheduler import (
+        TASK_NAME,
+        configure_windows_scheduler,
+    )
+
+    calls = []
+
+    def fake_runner(command, **kwargs):
+        calls.append((command, kwargs))
+
+    with patch(
+        "windows_scheduler.platform.system",
+        return_value="Windows",
+    ):
+        command = configure_windows_scheduler(
+            frequency="manual",
+            runner=fake_runner,
+        )
+
+    assert command == [
+        "schtasks.exe",
+        "/Delete",
+        "/TN",
+        TASK_NAME,
+        "/F",
+    ]
+    assert calls[0][0] == command
+
+
+def test_windows_scheduler_rejects_invalid_frequency():
+    from windows_scheduler import build_schtasks_create_command
+
+    with pytest.raises(ValueError):
+        build_schtasks_create_command("manual")
+
+
+def test_scheduler_wrapper_uses_windows_scheduler(tmp_path):
     with patch.object(
         app_inventory.platform,
         "system",
         return_value="Windows",
-    ), patch.object(app_inventory, "configure_linux_scheduler") as scheduler:
-        result = app_inventory.configure_scheduler_for_frequency("hourly")
+    ), patch.object(
+        app_inventory,
+        "configure_windows_scheduler",
+        return_value=["schtasks.exe"],
+    ) as scheduler:
+        result = app_inventory.configure_scheduler_for_frequency(
+            "Every 6 hours"
+        )
+
+    scheduler.assert_called_once_with(
+        frequency="six_hourly",
+        application_path=app_inventory.os.path.abspath(app_inventory.__file__),
+        python_executable=app_inventory.sys.executable,
+    )
+    assert result == ["schtasks.exe"]
+
+
+def test_scheduler_wrapper_keeps_macos_without_scheduler():
+    with patch.object(
+        app_inventory.platform,
+        "system",
+        return_value="Darwin",
+    ), patch.object(
+        app_inventory,
+        "configure_linux_scheduler",
+    ) as linux_scheduler, patch.object(
+        app_inventory,
+        "configure_windows_scheduler",
+    ) as windows_scheduler:
+        result = app_inventory.configure_scheduler_for_frequency("daily")
 
     assert result is None
-    scheduler.assert_not_called()
+    linux_scheduler.assert_not_called()
+    windows_scheduler.assert_not_called()

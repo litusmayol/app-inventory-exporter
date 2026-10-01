@@ -65,7 +65,7 @@ def build_timer_content(frequency):
         schedule = "OnBootSec=1min"
     elif frequency in FREQUENCY_INTERVALS:
         interval = FREQUENCY_INTERVALS[frequency]
-        schedule = f"OnUnitActiveSec={interval}"
+        schedule = f"OnActiveSec=1min\nOnUnitActiveSec={interval}"
     else:
         raise ValueError(f"Unsupported automatic frequency: {frequency}")
 

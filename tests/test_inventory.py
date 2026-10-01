@@ -357,6 +357,7 @@ def test_linux_scheduler_builds_hourly_units(tmp_path):
 
     assert "app_inventory.py" in service_content
     assert "--export" in service_content
+    assert "OnActiveSec=1min" in timer_content
     assert "OnUnitActiveSec=1h" in timer_content
 
     with patch("linux_scheduler.platform.system", return_value="Linux"):

@@ -17,8 +17,10 @@ This project is currently an early preview.
 - Manual Markdown export from a graphical interface built with Tkinter.
 - Up to five output destinations for each export.
 - Interface labels in Catalan, English, and Spanish.
-- Linux APT package detection on Debian/Ubuntu-like systems.
-- Best-effort Snap package detection when Snap is installed.
+- Linux APT package detection on Debian/Ubuntu-like systems, including package versions and descriptions.
+- Snap application detection when Snap is installed, including versions and summaries.
+- GNOME Shell extension detection, including UUID, name, state, and enabled status.
+- Flatpak application detection when Flatpak is installed, including application ID, version, and installation scope.
 - Limited macOS support: lists `.app` bundles directly inside `/Applications`.
 
 ### Platform status
@@ -35,9 +37,9 @@ This project is currently an early preview.
 - The Windows executable is not Authenticode-signed.
 - The macOS application is Apple Silicon (`arm64`) only.
 - The macOS application is not notarized by Apple.
-- GNOME extension detection is not implemented.
+- GNOME extension detection is currently implemented for Linux.
 - Direct SMB authentication or mounting is not implemented.
-- Complete application inventories for every Linux distribution are not implemented.
+- Complete application inventories for every Linux distribution are not implemented; Ubuntu/Debian has the broadest supported coverage.
 - The Linux scheduler depends on the user's `systemd --user` service.
 - Windows and macOS scheduler integration is not implemented yet.
 
@@ -69,8 +71,10 @@ Aquest projecte es troba actualment en una fase inicial de proves.
 - Exportació manual a Markdown mitjançant una interfície gràfica desenvolupada amb Tkinter.
 - Fins a cinc destinacions de sortida per a cada exportació.
 - Etiquetes de la interfície en català, anglès i castellà.
-- Detecció de paquets APT en sistemes semblants a Debian/Ubuntu.
-- Detecció subjecta a disponibilitat dels paquets Snap quan Snap està instal·lat.
+- Detecció de paquets APT en sistemes semblants a Debian/Ubuntu, incloses les versions i descripcions.
+- Detecció d'aplicacions Snap quan Snap està instal·lat, incloses les versions i els resums.
+- Detecció d'extensions de GNOME Shell, inclosos l'UUID, el nom, l'estat i si estan habilitades.
+- Detecció d'aplicacions Flatpak quan Flatpak està instal·lat, inclosos l'ID, la versió i l'àmbit d'instal·lació.
 - Suport limitat per a macOS: mostra els paquets `.app` situats directament dins de `/Applications`.
 
 ### Estat per plataforma
@@ -87,9 +91,9 @@ Aquest projecte es troba actualment en una fase inicial de proves.
 - L'executable de Windows no està signat amb Authenticode.
 - L'aplicació de macOS només és per a Apple Silicon (`arm64`).
 - L'aplicació de macOS no està notaritzada per Apple.
-- La detecció d'extensions del GNOME no està implementada.
+- La detecció d'extensions del GNOME està implementada actualment per a Linux.
 - L'autenticació o el muntatge directe de recursos SMB no està implementat.
-- No s'han implementat inventaris complets per a totes les distribucions Linux.
+- No s'han implementat inventaris complets per a totes les distribucions Linux; Ubuntu/Debian té la cobertura compatible més àmplia.
 - El planificador de Linux depèn del servei `systemd --user` de la sessió de l'usuari.
 - La integració amb els planificadors de Windows i macOS encara no està implementada.
 

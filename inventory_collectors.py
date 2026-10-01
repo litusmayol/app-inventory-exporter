@@ -1,3 +1,4 @@
+import subprocess
 import platform
 
 
@@ -214,3 +215,92 @@ def collect_macos_applications(
 
     applications.sort(key=lambda item: item["name"].casefold())
     return applications
+
+
+def collect_gnome_extensions(runner=None):
+    """Return installed GNOME Shell extensions and their states."""
+    if runner is None:
+        runner = subprocess.run
+
+    try:
+        result = runner(
+            ["gnome-extensions", "list"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return []
+
+    extensions = []
+
+    for line in result.stdout.splitlines():
+        uuid = line.strip()
+
+        if not uuid:
+            continue
+
+        try:
+            info_result = runner(
+                ["gnome-extensions", "info", uuid],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except (OSError, subprocess.CalledProcessError):
+            info_result = None
+
+        metadata = _parse_gnome_extension_info(
+            info_result.stdout if info_result else ""
+        )
+
+        extensions.append(
+            {
+                "uuid": uuid,
+                "name": metadata.get("name", uuid),
+                "state": metadata.get("state", "Unknown"),
+                "enabled": metadata.get("enabled", ""),
+                "description": metadata.get("description", ""),
+                "source": "GNOME Shell Extension",
+            }
+        )
+
+    extensions.sort(key=lambda item: item["name"].casefold())
+    return extensions
+
+
+def _parse_gnome_extension_info(output):
+    """Parse the human-readable output of gnome-extensions info."""
+    metadata = {}
+    description_lines = []
+    reading_description = False
+
+    for raw_line in output.splitlines():
+        line = raw_line.strip()
+
+        if not line:
+            continue
+
+        if ":" in line:
+            key, value = line.split(":", 1)
+            normalized_key = key.strip().casefold()
+            value = value.strip()
+
+            if normalized_key in {"name", "nom"}:
+                metadata["name"] = value
+            elif normalized_key in {"state", "estat"}:
+                metadata["state"] = value
+            elif normalized_key in {"description", "descripció", "descripcio"}:
+                metadata["description"] = value
+                reading_description = True
+            elif normalized_key in {"enabled", "habilitat"}:
+                metadata["enabled"] = value
+            elif reading_description:
+                description_lines.append(line)
+        elif reading_description:
+            description_lines.append(line)
+
+    if description_lines:
+        metadata["description"] = " ".join(description_lines)
+
+    return metadata

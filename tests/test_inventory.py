@@ -598,3 +598,148 @@ def test_windows_scheduler_reports_create_failure():
             frequency="hourly",
             runner=failed_runner,
         )
+
+
+def test_gnome_extension_collector_reads_names_and_states():
+    from inventory_collectors import collect_gnome_extensions
+
+    outputs = {
+        ("gnome-extensions", "list"): (
+            "z-extension@example.com\n"
+            "a-extension@example.com\n"
+        ),
+        ("gnome-extensions", "info", "z-extension@example.com"): (
+            "Name: Z Extension\n"
+            "Description: A test extension\n"
+            "State: ENABLED\n"
+        ),
+        ("gnome-extensions", "info", "a-extension@example.com"): (
+            "Name: A Extension\n"
+            "Description: Another test extension\n"
+            "State: DISABLED\n"
+        ),
+    }
+
+    def fake_runner(command, **kwargs):
+        return type(
+            "Completed",
+            (),
+            {
+                "stdout": outputs[tuple(command)],
+                "returncode": 0,
+            },
+        )()
+
+    extensions = collect_gnome_extensions(runner=fake_runner)
+
+    assert extensions == [
+        {
+            "uuid": "a-extension@example.com",
+            "name": "A Extension",
+            "state": "DISABLED",
+            "enabled": "",
+            "description": "Another test extension",
+            "source": "GNOME Shell Extension",
+        },
+        {
+            "uuid": "z-extension@example.com",
+            "name": "Z Extension",
+            "state": "ENABLED",
+            "enabled": "",
+            "description": "A test extension",
+            "source": "GNOME Shell Extension",
+        },
+    ]
+
+
+def test_gnome_extension_collector_returns_empty_when_command_is_missing():
+    from inventory_collectors import collect_gnome_extensions
+
+    def missing_runner(command, **kwargs):
+        raise FileNotFoundError
+
+    assert collect_gnome_extensions(runner=missing_runner) == []
+
+
+def test_gnome_extension_collector_parses_catalan_info_output():
+    from inventory_collectors import collect_gnome_extensions
+
+    outputs = {
+        ("gnome-extensions", "list"): (
+            "just-perfection-desktop@just-perfection\n"
+            "ubuntu-dock@ubuntu.com\n"
+        ),
+        ("gnome-extensions", "info", "just-perfection-desktop@just-perfection"): (
+            "just-perfection-desktop@just-perfection\n"
+            "  Nom: Just Perfection\n"
+            "  Descripció: Tweak Tool per personalitzar GNOME Shell\n"
+            "  Habilitat: Sí\n"
+            "  Estat: ACTIVE\n"
+        ),
+        ("gnome-extensions", "info", "ubuntu-dock@ubuntu.com"): (
+            "ubuntu-dock@ubuntu.com\n"
+            "  Nom: Ubuntu Dock\n"
+            "  Descripció: A dock for GNOME Shell\n"
+            "  Habilitat: No\n"
+            "  Estat: INITIALIZED\n"
+        ),
+    }
+
+    def fake_runner(command, **kwargs):
+        return type(
+            "Completed",
+            (),
+            {
+                "stdout": outputs[tuple(command)],
+                "returncode": 0,
+            },
+        )()
+
+    extensions = collect_gnome_extensions(runner=fake_runner)
+
+    assert extensions[0]["name"] == "Just Perfection"
+    assert extensions[0]["state"] == "ACTIVE"
+    assert extensions[0]["enabled"] == "Sí"
+    assert extensions[0]["description"] == (
+        "Tweak Tool per personalitzar GNOME Shell"
+    )
+
+    assert extensions[1]["name"] == "Ubuntu Dock"
+    assert extensions[1]["state"] == "INITIALIZED"
+    assert extensions[1]["enabled"] == "No"
+
+
+def test_gnome_extension_collector_parses_metadata_after_blank_description_lines():
+    from inventory_collectors import collect_gnome_extensions
+
+    outputs = {
+        ("gnome-extensions", "list"): "blur-my-shell@aunetx\n",
+        ("gnome-extensions", "info", "blur-my-shell@aunetx"): (
+            "blur-my-shell@aunetx\n"
+            "  Nom: Blur my Shell\n"
+            "  Descripció: Adds a blur look to GNOME Shell.\n"
+            "\n"
+            "You can support my work by sponsoring me on:\n"
+            "\n"
+            "- github: https://github.com/example\n"
+            "  Camí: /home/example/blur-my-shell\n"
+            "  Habilitat: No\n"
+            "  Estat: INITIALIZED\n"
+         ),
+    }
+
+    def fake_runner(command, **kwargs):
+        return type(
+            "Completed",
+            (),
+            {
+                "stdout": outputs[tuple(command)],
+                "returncode": 0,
+            },
+        )()
+
+    extensions = collect_gnome_extensions(runner=fake_runner)
+
+    assert extensions[0]["name"] == "Blur my Shell"
+    assert extensions[0]["enabled"] == "No"
+    assert extensions[0]["state"] == "INITIALIZED"

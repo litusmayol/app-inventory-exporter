@@ -8,6 +8,7 @@ from tkinter import ttk, filedialog, messagebox
 import datetime
 
 from inventory_collectors import (
+    collect_gnome_extensions,
     collect_macos_applications,
     collect_windows_applications,
 )
@@ -340,6 +341,34 @@ class AppInventoryGUI:
                         md_lines.append(f"| Snap | Sistema/Inicial | {s_name} | {desc} |")
             except Exception:
                 pass
+
+            try:
+                gnome_extensions = collect_gnome_extensions()
+
+                for extension in gnome_extensions:
+                    name = extension["name"].replace("|", "-")
+                    uuid = extension["uuid"].replace("|", "-")
+                    state = extension["state"].replace("|", "-")
+                    enabled = extension.get("enabled", "").replace("|", "-")
+                    description = extension["description"].replace("|", "-")
+
+                    details = f"UUID: {uuid}; Estat: {state}"
+
+                    if enabled:
+                        details += f"; Habilitat: {enabled}"
+
+                    if description:
+                        details += f"; {description}"
+
+                    md_lines.append(
+                        f"| GNOME | GNOME Shell Extension | {name} | "
+                        f"{details} |"
+                    )
+            except Exception as error:
+                md_lines.append(
+                    f"| GNOME | Error | Error en obtenir extensions GNOME: "
+                    f"{error} | - |"
+                )
 
         elif system == "Darwin":
             macos_applications = collect_macos_applications()

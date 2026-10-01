@@ -7,6 +7,12 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import datetime
 
+from inventory_collectors import (
+    collect_macos_applications,
+    collect_windows_applications,
+)
+from linux_scheduler import configure_linux_scheduler
+
 CONFIG_FILE = os.path.expanduser("~/.app_inventory_config.json")
 
 # Diccionario de traducciones
@@ -64,6 +70,75 @@ TRANSLATIONS = {
     }
 }
 
+FREQUENCY_KEYS = (
+    "manual",
+    "hourly",
+    "six_hourly",
+    "daily",
+    "startup",
+)
+
+FREQUENCY_LABELS = {
+    "Català": {
+        "manual": "Manual",
+        "hourly": "Cada hora",
+        "six_hourly": "Cada 6 hores",
+        "daily": "Diari",
+        "startup": "En iniciar el sistema",
+    },
+    "English": {
+        "manual": "Manual",
+        "hourly": "Every hour",
+        "six_hourly": "Every 6 hours",
+        "daily": "Daily",
+        "startup": "On system startup",
+    },
+    "Español": {
+        "manual": "Manual",
+        "hourly": "Cada hora",
+        "six_hourly": "Cada 6 horas",
+        "daily": "Diario",
+        "startup": "Al iniciar el sistema",
+    },
+}
+
+
+def frequency_key_from_value(value):
+    """Convert a canonical key or translated legacy label to a key."""
+    if value in FREQUENCY_KEYS:
+        return value
+
+    for labels in FREQUENCY_LABELS.values():
+        for key, label in labels.items():
+            if value == label:
+                return key
+
+    return "manual"
+
+
+def frequency_label_for(language, key):
+    """Return the translated GUI label for a canonical frequency key."""
+    labels = FREQUENCY_LABELS.get(language, FREQUENCY_LABELS["Català"])
+    return labels.get(key, labels["manual"])
+
+
+def configure_scheduler_for_frequency(frequency):
+    """Write the scheduler configuration for the current platform.
+
+    The timer is deliberately not activated yet. This first integration
+    creates or removes the Linux unit files so they can be inspected safely.
+    """
+    if platform.system() != "Linux":
+        return None
+
+    return configure_linux_scheduler(
+        frequency=frequency_key_from_value(frequency),
+        application_path=os.path.abspath(__file__),
+        python_executable=sys.executable,
+        activate=False,
+    )
+
+
 class AppInventoryGUI:
     def __init__(self, root):
         self.root = root
@@ -101,9 +176,18 @@ class AppInventoryGUI:
         self.lbl_freq = ttk.Label(self.freq_frame, text=t["freq_label"])
         self.lbl_freq.grid(row=0, column=0, sticky="w", padx=5)
         
-        self.freq_var = tk.StringVar(value=self.saved_config.get("frequency", t["freq_options"][0]))
-        self.freq_combo = ttk.Combobox(self.freq_frame, textvariable=self.freq_var, state="readonly", 
-                                       values=t["freq_options"])
+        saved_frequency = frequency_key_from_value(
+            self.saved_config.get("frequency", "manual")
+        )
+        self.freq_var = tk.StringVar(
+            value=frequency_label_for(self.current_lang, saved_frequency)
+        )
+        self.freq_combo = ttk.Combobox(
+            self.freq_frame,
+            textvariable=self.freq_var,
+            state="readonly",
+            values=t["freq_options"],
+        )
         self.freq_combo.grid(row=0, column=1, sticky="w", padx=5)
 
         # --- Frame de Destinos (Hasta 5) ---
@@ -156,6 +240,7 @@ class AppInventoryGUI:
         self.btn_run.pack(side="right", padx=5)
 
     def change_language(self, event=None):
+        selected_frequency = frequency_key_from_value(self.freq_var.get())
         self.current_lang = self.lang_var.get()
         t = TRANSLATIONS[self.current_lang]
 
@@ -163,6 +248,9 @@ class AppInventoryGUI:
         self.freq_frame.config(text=t["freq_title"])
         self.lbl_freq.config(text=t["freq_label"])
         self.freq_combo.config(values=t["freq_options"])
+        self.freq_var.set(
+            frequency_label_for(self.current_lang, selected_frequency)
+        )
         
         self.dest_frame.config(text=t["dest_title"])
         self.lbl_act.config(text=t["active"])
@@ -193,7 +281,7 @@ class AppInventoryGUI:
     def save_config(self):
         config_data = {
             "language": self.current_lang,
-            "frequency": self.freq_var.get(),
+            "frequency": frequency_key_from_value(self.freq_var.get()),
             "destinations": [
                 {
                     "active": item["active"].get(),
@@ -205,7 +293,12 @@ class AppInventoryGUI:
         }
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(config_data, f, indent=4)
-        
+
+        try:
+            configure_scheduler_for_frequency(config_data["frequency"])
+        except (OSError, subprocess.CalledProcessError) as error:
+            print(f"Scheduler configuration warning: {error}")
+
         t = TRANSLATIONS[self.current_lang]
         messagebox.showinfo(t["title"], t["saved_msg"])
 
@@ -242,14 +335,71 @@ class AppInventoryGUI:
                 pass
 
         elif system == "Darwin":
-            apps_dir = "/Applications"
-            if os.path.exists(apps_dir):
-                for app in os.listdir(apps_dir):
-                    if app.endswith(".app"):
-                        md_lines.append(f"| App macOS | /Applications | {app.replace('.app', '')} | Aplicació instal·lada a macOS |")
+            macos_applications = collect_macos_applications()
+
+            if not macos_applications:
+                md_lines.append(
+                    "| App macOS | Sistema | No s'han trobat aplicacions | - |"
+                )
+            else:
+                for application in macos_applications:
+                    name = application["name"].replace("|", "-")
+                    version = application["version"].replace("|", "-")
+                    location = application["install_location"].replace("|", "-")
+                    bundle_identifier = application[
+                        "bundle_identifier"
+                    ].replace("|", "-")
+
+                    description_parts = []
+
+                    if version:
+                        description_parts.append(f"Versió: {version}")
+
+                    if bundle_identifier:
+                        description_parts.append(
+                            f"Identificador: {bundle_identifier}"
+                        )
+
+                    description_parts.append(f"Ubicació: {location}")
+                    description = "; ".join(description_parts)
+
+                    md_lines.append(
+                        f"| App macOS | Application Bundle | {name} | "
+                        f"{description} |"
+                    )
 
         elif system == "Windows":
-            md_lines.append("| Windows | Sistema | Programari Windows | Consultat via interfície |")
+            windows_applications = collect_windows_applications()
+
+            if not windows_applications:
+                md_lines.append(
+                    "| Windows | Registry | No s'han trobat aplicacions | - |"
+                )
+            else:
+                for application in windows_applications:
+                    name = application["name"].replace("|", "-")
+                    version = application["version"].replace("|", "-")
+                    publisher = application["publisher"].replace("|", "-")
+                    description_parts = []
+
+                    if version:
+                        description_parts.append(f"Versió: {version}")
+
+                    if publisher:
+                        description_parts.append(f"Editor: {publisher}")
+
+                    if application["install_location"]:
+                        description_parts.append(
+                            f"Ubicació: {application['install_location']}"
+                        )
+
+                    description = "; ".join(description_parts) or "-"
+                    description = description.replace("|", "-")
+
+                    md_lines.append(
+                        f"| Windows | Registry | {name} | "
+                        f"{description} |"
+                    )
 
         return "\n".join(md_lines)
 
@@ -281,7 +431,63 @@ class AppInventoryGUI:
         else:
             messagebox.showwarning(t["title"], t["warning_msg"])
 
+
+def export_from_config(config_path=CONFIG_FILE):
+    """Generate Markdown and write all active configured destinations.
+
+    Returns the number of files successfully written.
+    Raises ValueError for invalid configuration and OSError for file errors.
+    """
+    with open(config_path, "r", encoding="utf-8") as config_file:
+        config_data = json.load(config_file)
+
+    app = object.__new__(AppInventoryGUI)
+    content = app.generate_markdown_content()
+    destinations = config_data.get("destinations", [])
+
+    written_count = 0
+
+    for destination in destinations:
+        if not destination.get("active", False):
+            continue
+
+        target_dir = str(destination.get("dir", "")).strip()
+        filename = str(destination.get("file", "")).strip()
+
+        if not target_dir or not filename:
+            continue
+
+        if not filename.lower().endswith(".md"):
+            filename = f"{filename}.md"
+
+        os.makedirs(target_dir, exist_ok=True)
+
+        output_path = os.path.join(target_dir, filename)
+        with open(output_path, "w", encoding="utf-8") as output_file:
+            output_file.write(content)
+
+        written_count += 1
+
+    return written_count
+
 if __name__ == "__main__":
+    if "--export" in sys.argv:
+        try:
+            exported_count = export_from_config()
+        except FileNotFoundError:
+            print(f"Configuration file not found: {CONFIG_FILE}", file=sys.stderr)
+            sys.exit(1)
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            print(f"Export failed: {error}", file=sys.stderr)
+            sys.exit(1)
+
+        if exported_count == 0:
+            print("No active export destinations were found.", file=sys.stderr)
+            sys.exit(1)
+
+        print(f"Exported {exported_count} Markdown file(s).")
+        sys.exit(0)
+
     root = tk.Tk()
     app = AppInventoryGUI(root)
     root.mainloop()

@@ -925,3 +925,15 @@ def test_package_collectors_return_empty_when_tools_are_missing():
 
     assert collect_apt_packages(runner=missing_runner) == []
     assert collect_snap_applications(runner=missing_runner) == []
+
+
+def test_format_markdown_cell_normalizes_and_truncates_text():
+    assert app_inventory.format_markdown_cell(
+        "  First line | second line\n\nthird line  "
+    ) == "First line - second line third line"
+
+    result = app_inventory.format_markdown_cell("x" * 250)
+
+    assert len(result) == 240
+    assert result.endswith("…")
+    assert "|" not in result

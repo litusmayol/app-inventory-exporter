@@ -127,6 +127,19 @@ def frequency_label_for(language, key):
     return labels.get(key, labels["manual"])
 
 
+def format_markdown_cell(value, max_length=240):
+    """Normalize text before inserting it into a Markdown table cell."""
+    if value is None:
+        return ""
+
+    normalized = " ".join(str(value).replace("|", "-").split())
+
+    if len(normalized) > max_length:
+        return normalized[: max_length - 1].rstrip() + "…"
+
+    return normalized
+
+
 def configure_scheduler_for_frequency(frequency):
     """Configure the native scheduler for the current platform."""
     canonical_frequency = frequency_key_from_value(frequency)
@@ -319,9 +332,9 @@ class AppInventoryGUI:
 
         if system == "Linux":
             for package in collect_apt_packages():
-                name = package["name"].replace("|", "-")
-                version = package["version"].replace("|", "-")
-                description = package["description"].replace("|", "-")
+                name = format_markdown_cell(package["name"])
+                version = format_markdown_cell(package["version"])
+                description = format_markdown_cell(package["description"])
 
                 details = f"Versió: {version}" if version else "-"
                 if description:
@@ -332,9 +345,11 @@ class AppInventoryGUI:
                 )
 
             for application in collect_snap_applications():
-                name = application["name"].replace("|", "-")
-                version = application["version"].replace("|", "-")
-                description = application["description"].replace("|", "-")
+                name = format_markdown_cell(application["name"])
+                version = format_markdown_cell(application["version"])
+                description = format_markdown_cell(
+                    application["description"]
+                )
 
                 details = f"Versió: {version}" if version else "-"
                 if description:
@@ -349,11 +364,15 @@ class AppInventoryGUI:
                 gnome_extensions = collect_gnome_extensions()
 
                 for extension in gnome_extensions:
-                    name = extension["name"].replace("|", "-")
-                    uuid = extension["uuid"].replace("|", "-")
-                    state = extension["state"].replace("|", "-")
-                    enabled = extension.get("enabled", "").replace("|", "-")
-                    description = extension["description"].replace("|", "-")
+                    name = format_markdown_cell(extension["name"])
+                    uuid = format_markdown_cell(extension["uuid"])
+                    state = format_markdown_cell(extension["state"])
+                    enabled = format_markdown_cell(
+                        extension.get("enabled", "")
+                    )
+                    description = format_markdown_cell(
+                        extension["description"]
+                    )
 
                     details = f"UUID: {uuid}; Estat: {state}"
 
@@ -377,13 +396,13 @@ class AppInventoryGUI:
                 flatpak_applications = collect_flatpak_applications()
 
                 for application in flatpak_applications:
-                    application_id = application["application_id"].replace(
-                        "|", "-"
+                    application_id = format_markdown_cell(
+                        application["application_id"]
                     )
-                    name = application["name"].replace("|", "-")
-                    version = application["version"].replace("|", "-")
-                    installation = application["installation"].replace(
-                        "|", "-"
+                    name = format_markdown_cell(application["name"])
+                    version = format_markdown_cell(application["version"])
+                    installation = format_markdown_cell(
+                        application["installation"]
                     )
 
                     details = f"ID: {application_id}"

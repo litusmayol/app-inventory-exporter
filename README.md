@@ -21,40 +21,40 @@ This project is currently an early preview.
 - Best-effort Snap package detection when Snap is installed.
 - Limited macOS support: lists `.app` bundles directly inside `/Applications`.
 
-### Not yet implemented
+### Platform status
 
-- Windows installed-application detection.
-- A Windows `.exe` download.
-- A macOS application download.
-- Automatic hourly, six-hourly, daily, or startup exports.
-- GNOME extension detection.
-- Direct SMB authentication or mounting.
-- Complete application inventories for macOS or for Linux distributions beyond the currently supported package sources.
+| Platform | Application build | Automatic scheduling |
+| --- | --- | --- |
+| Linux x86-64 | Available | Available through `systemd --user` |
+| Windows x86-64 | Available as `.exe` | Not implemented |
+| macOS Apple Silicon | Available as `.zip` containing an `.app` | Not implemented |
+
+### Known limitations
+
+- This is a preview release and has not been tested on every supported operating-system version.
+- The Windows executable is not Authenticode-signed.
+- The macOS application is Apple Silicon (`arm64`) only.
+- The macOS application is not notarized by Apple.
+- GNOME extension detection is not implemented.
+- Direct SMB authentication or mounting is not implemented.
+- Complete application inventories for every Linux distribution are not implemented.
+- The Linux scheduler depends on the user's `systemd --user` service.
+- Windows and macOS scheduler integration is not implemented yet.
 
 ## Downloads
 
-The current release contains one Linux x86-64 executable:
+The current preview release is:
 
-- `AppInventoryExporter` — Linux x86-64 only.
+[v0.2.0 - Cross-platform Preview](https://github.com/litusmayol/app-inventory-exporter/releases/tag/v0.2.0 )
 
-Windows and macOS users should not download this file. Native Windows and macOS builds are planned but are not available yet.
+Available downloads:
 
-## Running from source
+- `AppInventoryExporter-linux-x86_64` — Linux x86-64.
+- `AppInventoryExporter-windows-x86_64.exe` — Windows x86-64.
+- `AppInventoryExporter-macos-arm64.zip` — macOS Apple Silicon only.
+- `SHA256SUMS.txt` — checksums for verifying downloads.
 
-Requirements:
-
-- Python 3.10 or newer.
-- Tkinter.
-
-Run:
-
-```bash
-python3 app_inventory.py
-```
-
-The **Save Settings** button must be pressed to save the configuration. The frequency selector currently stores a preference but does not yet run exports automatically.
-
----
+Windows and macOS downloads are preview builds and are not signed/notarized production installers.
 
 ## Català
 
@@ -73,23 +73,40 @@ Aquest projecte es troba actualment en una fase inicial de proves.
 - Detecció subjecta a disponibilitat dels paquets Snap quan Snap està instal·lat.
 - Suport limitat per a macOS: mostra els paquets `.app` situats directament dins de `/Applications`.
 
-### Funcionalitats encara no implementades
+### Estat per plataforma
 
-- Detecció d'aplicacions instal·lades a Windows.
-- Descàrrega d'un fitxer `.exe` per a Windows.
-- Descàrrega d'una aplicació per a macOS.
-- Exportacions automàtiques cada hora, cada sis hores, diàries o en iniciar el sistema.
-- Detecció d'extensions del GNOME.
-- Autenticació o muntatge directe de recursos SMB.
-- Inventaris complets d'aplicacions per a macOS o per a distribucions Linux més enllà de les fonts de paquets compatibles actualment.
+| Plataforma | Versió de l'aplicació | Exportacions automàtiques |
+| --- | --- | --- |
+| Linux x86-64 | Disponible | Disponible mitjançant `systemd --user` |
+| Windows x86-64 | Disponible com a `.exe` | Encara no implementades |
+| macOS Apple Silicon | Disponible com a `.zip` amb una aplicació `.app` | Encara no implementades |
+
+### Limitacions conegudes
+
+- Aquesta és una versió preliminar i no s'ha provat en totes les versions dels sistemes operatius compatibles.
+- L'executable de Windows no està signat amb Authenticode.
+- L'aplicació de macOS només és per a Apple Silicon (`arm64`).
+- L'aplicació de macOS no està notaritzada per Apple.
+- La detecció d'extensions del GNOME no està implementada.
+- L'autenticació o el muntatge directe de recursos SMB no està implementat.
+- No s'han implementat inventaris complets per a totes les distribucions Linux.
+- El planificador de Linux depèn del servei `systemd --user` de la sessió de l'usuari.
+- La integració amb els planificadors de Windows i macOS encara no està implementada.
 
 ## Descàrregues
 
-La versió actual conté un únic executable per a Linux x86-64:
+La versió preliminar actual és:
 
-- `AppInventoryExporter` — només per a Linux x86-64.
+[v0.2.0 - Cross-platform Preview](https://github.com/litusmayol/app-inventory-exporter/releases/tag/v0.2.0 )
 
-Els usuaris de Windows i macOS no haurien de descarregar aquest fitxer. Les versions natives per a Windows i macOS estan previstes, però encara no estan disponibles.
+Descàrregues disponibles:
+
+- `AppInventoryExporter-linux-x86_64` — Linux x86-64.
+- `AppInventoryExporter-windows-x86_64.exe` — Windows x86-64.
+- `AppInventoryExporter-macos-arm64.zip` — només macOS Apple Silicon.
+- `SHA256SUMS.txt` — sumes de comprovació per verificar les descàrregues.
+
+Les versions de Windows i macOS són preliminars i no són instal·ladors de producció signats/notaritzats.
 
 ## Execució des del codi font
 
@@ -104,4 +121,4 @@ Execució:
 python3 app_inventory.py
 ```
 
-Cal prémer el botó **Desar configuració** per desar la configuració. El selector de freqüència actualment només desa una preferència, però encara no executa exportacions automàticament.
+El botó **Desar configuració** desa la configuració. A Linux, seleccionar una freqüència automàtica també configura i activa el temporitzador `systemd` de l'usuari.

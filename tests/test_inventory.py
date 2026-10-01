@@ -386,3 +386,38 @@ def test_linux_scheduler_rejects_invalid_frequency():
 
     with pytest.raises(ValueError):
         build_timer_content("manual")
+
+
+def test_scheduler_wrapper_uses_canonical_frequency(tmp_path):
+    with patch.object(
+        app_inventory.platform,
+        "system",
+        return_value="Linux",
+    ), patch.object(
+        app_inventory,
+        "configure_linux_scheduler",
+        return_value={"timer": tmp_path / "app-inventory-exporter.timer"},
+    ) as scheduler:
+        result = app_inventory.configure_scheduler_for_frequency(
+            "Cada 6 hores"
+        )
+
+    scheduler.assert_called_once_with(
+        frequency="six_hourly",
+        application_path=app_inventory.os.path.abspath(app_inventory.__file__),
+        python_executable=app_inventory.sys.executable,
+        activate=False,
+    )
+    assert result["timer"].name == "app-inventory-exporter.timer"
+
+
+def test_scheduler_wrapper_does_nothing_on_non_linux():
+    with patch.object(
+        app_inventory.platform,
+        "system",
+        return_value="Windows",
+    ), patch.object(app_inventory, "configure_linux_scheduler") as scheduler:
+        result = app_inventory.configure_scheduler_for_frequency("hourly")
+
+    assert result is None
+    scheduler.assert_not_called()

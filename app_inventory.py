@@ -11,6 +11,7 @@ from inventory_collectors import (
     collect_macos_applications,
     collect_windows_applications,
 )
+from linux_scheduler import configure_linux_scheduler
 
 CONFIG_FILE = os.path.expanduser("~/.app_inventory_config.json")
 
@@ -119,6 +120,23 @@ def frequency_label_for(language, key):
     """Return the translated GUI label for a canonical frequency key."""
     labels = FREQUENCY_LABELS.get(language, FREQUENCY_LABELS["Català"])
     return labels.get(key, labels["manual"])
+
+
+def configure_scheduler_for_frequency(frequency):
+    """Write the scheduler configuration for the current platform.
+
+    The timer is deliberately not activated yet. This first integration
+    creates or removes the Linux unit files so they can be inspected safely.
+    """
+    if platform.system() != "Linux":
+        return None
+
+    return configure_linux_scheduler(
+        frequency=frequency_key_from_value(frequency),
+        application_path=os.path.abspath(__file__),
+        python_executable=sys.executable,
+        activate=False,
+    )
 
 
 class AppInventoryGUI:
@@ -275,7 +293,12 @@ class AppInventoryGUI:
         }
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(config_data, f, indent=4)
-        
+
+        try:
+            configure_scheduler_for_frequency(config_data["frequency"])
+        except (OSError, subprocess.CalledProcessError) as error:
+            print(f"Scheduler configuration warning: {error}")
+
         t = TRANSLATIONS[self.current_lang]
         messagebox.showinfo(t["title"], t["saved_msg"])
 

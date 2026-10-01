@@ -31,8 +31,9 @@ def build_schtasks_create_command(
     frequency,
     application_path=None,
     python_executable=None,
+    packaged=False,
 ):
-    """Build the Windows Task Scheduler command without executing it."""
+    """Build a Windows Task Scheduler command without executing it."""
     if frequency not in FREQUENCY_SCHEDULES:
         raise ValueError(f"Unsupported automatic frequency: {frequency}")
 
@@ -44,7 +45,10 @@ def build_schtasks_create_command(
     executable = Path(python_executable or sys.executable).resolve()
     schedule = FREQUENCY_SCHEDULES[frequency]
 
-    task_command = f'"{executable}" "{application}" --export'
+    if packaged:
+        task_command = f'"{executable}" --export'
+    else:
+        task_command = f'"{executable}" "{application}" --export'
 
     command = [
         "schtasks.exe",
@@ -94,7 +98,22 @@ def configure_windows_scheduler(
             frequency=frequency,
             application_path=application_path,
             python_executable=python_executable,
+            packaged=getattr(sys, "frozen", False),
         )
 
-    runner(command, check=False, capture_output=True, text=True)
+    result = runner(
+        command,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0 and frequency != "manual":
+        raise subprocess.CalledProcessError(
+            result.returncode,
+            command,
+            output=result.stdout,
+            stderr=result.stderr,
+        )
+
     return command

@@ -475,6 +475,15 @@ def test_windows_scheduler_deletes_manual_task():
 
     def fake_runner(command, **kwargs):
         calls.append((command, kwargs))
+        return type(
+            "Completed",
+            (),
+            {
+                "returncode": 0,
+                "stdout": "",
+                "stderr": "",
+            },
+        )()
 
     with patch(
         "windows_scheduler.platform.system",
@@ -541,3 +550,51 @@ def test_scheduler_wrapper_keeps_macos_without_scheduler():
     assert result is None
     linux_scheduler.assert_not_called()
     windows_scheduler.assert_not_called()
+
+
+def test_windows_scheduler_packaged_command_runs_executable_directly(tmp_path):
+    from windows_scheduler import build_schtasks_create_command
+
+    command = build_schtasks_create_command(
+        frequency="hourly",
+        application_path=tmp_path / "ignored.py",
+        python_executable=tmp_path / "AppInventoryExporter.exe",
+        packaged=True,
+    )
+
+    task_command = command[command.index("/TR") + 1]
+
+    assert task_command == (
+        f'"{tmp_path / "AppInventoryExporter.exe"}" --export'
+    )
+    assert "ignored.py" not in task_command
+
+
+def test_windows_scheduler_reports_create_failure():
+    import subprocess
+
+    from windows_scheduler import configure_windows_scheduler
+
+    def failed_runner(command, **kwargs):
+        return type(
+            "Completed",
+            (),
+            {
+                "returncode": 1,
+                "stdout": "",
+                "stderr": "The system cannot find the file specified.",
+            },
+        )()
+
+    with patch(
+        "windows_scheduler.platform.system",
+        return_value="Windows",
+    ), patch(
+        "windows_scheduler.sys.frozen",
+        True,
+        create=True,
+    ), pytest.raises(subprocess.CalledProcessError):
+        configure_windows_scheduler(
+            frequency="hourly",
+            runner=failed_runner,
+        )

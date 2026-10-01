@@ -1,3 +1,4 @@
+import pytest
 import importlib.util
 import sys
 import types
@@ -338,3 +339,50 @@ def test_frequency_labels_are_translated_from_canonical_keys():
 
 def test_unknown_frequency_defaults_to_manual():
     assert app_inventory.frequency_key_from_value("unknown") == "manual"
+
+
+def test_linux_scheduler_builds_hourly_units(tmp_path):
+    from linux_scheduler import (
+        build_service_content,
+        build_timer_content,
+        scheduler_paths,
+        write_scheduler_files,
+    )
+
+    service_content = build_service_content(
+        application_path=tmp_path / "app_inventory.py",
+        python_executable="/usr/bin/python3",
+    )
+    timer_content = build_timer_content("hourly")
+
+    assert "app_inventory.py" in service_content
+    assert "--export" in service_content
+    assert "OnUnitActiveSec=1h" in timer_content
+
+    with patch("linux_scheduler.platform.system", return_value="Linux"):
+        paths = write_scheduler_files(
+            "hourly",
+            application_path=tmp_path / "app_inventory.py",
+            python_executable="/usr/bin/python3",
+            home_directory=tmp_path / "home",
+        )
+
+    assert paths["service"].exists()
+    assert paths["timer"].exists()
+    assert "OnUnitActiveSec=1h" in paths["timer"].read_text()
+
+
+def test_linux_scheduler_builds_startup_timer(tmp_path):
+    from linux_scheduler import build_timer_content
+
+    content = build_timer_content("startup")
+
+    assert "OnBootSec=1min" in content
+    assert "Persistent=true" in content
+
+
+def test_linux_scheduler_rejects_invalid_frequency():
+    from linux_scheduler import build_timer_content
+
+    with pytest.raises(ValueError):
+        build_timer_content("manual")

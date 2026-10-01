@@ -97,28 +97,39 @@ def test_macos_branch_formats_collector_results():
 def test_linux_branch_collects_apt_packages():
     app = create_app_object()
 
-    with patch.object(app_inventory.platform, "system", return_value="Linux"), \
-         patch.object(
-             app_inventory.subprocess,
-             "check_output",
-             side_effect=[
-                 "python3\nvim\n",
-                 "Name Version Rev Tracking Publisher Notes\n",
-             ],
-         ), \
-         patch.object(
-             app_inventory.subprocess,
-             "run",
-             return_value=types.SimpleNamespace(
-                 stdout="A package description\n",
-                 returncode=0,
-             ),
-         ):
+    with patch.object(
+        app_inventory.platform,
+        "system",
+        return_value="Linux",
+    ), patch.object(
+        app_inventory,
+        "collect_apt_packages",
+        return_value=[
+            {
+                "name": "python3",
+                "version": "3.14",
+                "description": "Python interpreter",
+                "source": "APT",
+            }
+        ],
+    ), patch.object(
+        app_inventory,
+        "collect_snap_applications",
+        return_value=[],
+    ), patch.object(
+        app_inventory,
+        "collect_gnome_extensions",
+        return_value=[],
+    ), patch.object(
+        app_inventory,
+        "collect_flatpak_applications",
+        return_value=[],
+    ):
         content = app.generate_markdown_content()
 
     assert "| APT |" in content
     assert "python3" in content
-    assert "vim" in content
+    assert "3.14" in content
 
 
 def test_generated_content_contains_markdown_table():
@@ -797,3 +808,120 @@ def test_flatpak_collector_returns_empty_when_command_is_missing():
         raise FileNotFoundError
 
     assert collect_flatpak_applications(runner=missing_runner) == []
+
+
+def test_apt_collector_reads_version_and_multiline_description():
+    from inventory_collectors import collect_apt_packages
+
+    def fake_runner(command, **kwargs):
+        if command == ["apt-mark", "showmanual"]:
+            return type(
+                "Completed",
+                (),
+                {
+                    "stdout": "zeta-package\nchowtape\nlinux-image-test\n",
+                    "returncode": 0,
+                },
+            )()
+
+        if command[-1] == "chowtape":
+            return type(
+                "Completed",
+                (),
+                {
+                    "stdout": (
+                        "chowtape\t2.11.4\t"
+                        "Virtual audio effect using physical modelling.\n"
+                        " Includes additional audio formats.\n"
+                    ),
+                    "returncode": 0,
+                },
+            )()
+
+        if command[-1] == "zeta-package":
+            return type(
+                "Completed",
+                (),
+                {
+                    "stdout": "zeta-package\t1.0\tZeta package.\n",
+                    "returncode": 0,
+                },
+            )()
+
+        raise AssertionError(f"Unexpected command: {command}")
+
+    packages = collect_apt_packages(runner=fake_runner)
+
+    assert packages == [
+        {
+            "name": "chowtape",
+            "version": "2.11.4",
+            "description": (
+                "Virtual audio effect using physical modelling. "
+                "Includes additional audio formats."
+            ),
+            "source": "APT",
+        },
+        {
+            "name": "zeta-package",
+            "version": "1.0",
+            "description": "Zeta package.",
+            "source": "APT",
+        },
+    ]
+
+
+def test_snap_collector_reads_version_and_summary():
+    from inventory_collectors import collect_snap_applications
+
+    def fake_runner(command, **kwargs):
+        if command == ["snap", "list"]:
+            return type(
+                "Completed",
+                (),
+                {
+                    "stdout": (
+                        "Name Version Rev Tracking Publisher Notes\n"
+                        "firefox 156.0.1-1 8969 latest/stable mozilla✓ -\n"
+                        "core24 20260824 2124 latest/stable canonical✓ base\n"
+                    ),
+                    "returncode": 0,
+                },
+            )()
+
+        if command == ["snap", "info", "firefox"]:
+            return type(
+                "Completed",
+                (),
+                {
+                    "stdout": (
+                        "name: firefox\n"
+                        "summary: Mozilla Firefox web browser\n"
+                    ),
+                    "returncode": 0,
+                },
+            )()
+
+        raise AssertionError(f"Unexpected command: {command}")
+
+    applications = collect_snap_applications(runner=fake_runner)
+
+    assert applications == [
+        {
+            "name": "firefox",
+            "version": "156.0.1-1",
+            "description": "Mozilla Firefox web browser",
+            "source": "Snap",
+        }
+    ]
+
+
+def test_package_collectors_return_empty_when_tools_are_missing():
+    from inventory_collectors import collect_apt_packages
+    from inventory_collectors import collect_snap_applications
+
+    def missing_runner(command, **kwargs):
+        raise FileNotFoundError
+
+    assert collect_apt_packages(runner=missing_runner) == []
+    assert collect_snap_applications(runner=missing_runner) == []

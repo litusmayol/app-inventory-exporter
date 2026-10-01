@@ -8,9 +8,11 @@ from tkinter import ttk, filedialog, messagebox
 import datetime
 
 from inventory_collectors import (
+    collect_apt_packages,
     collect_flatpak_applications,
     collect_gnome_extensions,
     collect_macos_applications,
+    collect_snap_applications,
     collect_windows_applications,
 )
 from linux_scheduler import configure_linux_scheduler
@@ -316,32 +318,32 @@ class AppInventoryGUI:
         md_lines = ["# Llistat d'aplicacions i extensions instal·lades", "", "| Tipus | Data / Font | Nom | Descripció |", "| --- | --- | --- | --- |"]
 
         if system == "Linux":
-            try:
-                apt_out = subprocess.check_output("apt-mark showmanual", shell=True, text=True)
-                for pkg in apt_out.splitlines():
-                    if not pkg or any(k in pkg for k in ["language-pack", "gnome-user-docs", "gdm", "ubuntu-desktop", "linux-", "casper"]):
-                        continue
-                    desc_out = subprocess.run(f"dpkg-query -W -f='${{Description}}' {pkg}", shell=True, capture_output=True, text=True).stdout
-                    desc = desc_out.splitlines()[0].replace("|", "-") if desc_out else "Sense descripció"
-                    md_lines.append(f"| APT | Sistema/Inicial | {pkg} | {desc} |")
-            except Exception as e:
-                md_lines.append(f"| APT | Error | Error en obtenir paquets APT: {e} | - |")
+            for package in collect_apt_packages():
+                name = package["name"].replace("|", "-")
+                version = package["version"].replace("|", "-")
+                description = package["description"].replace("|", "-")
 
-            try:
-                snap_out = subprocess.check_output("snap list", shell=True, text=True)
-                for line in snap_out.splitlines()[1:]:
-                    parts = line.split()
-                    if parts and parts[0] not in ["bare", "gtk-common-themes", "snapd"] and not parts[0].startswith(("core", "gnome-")):
-                        s_name = parts[0]
-                        desc_out = subprocess.run(f"snap info {s_name}", shell=True, capture_output=True, text=True).stdout
-                        desc = "Sense descripció"
-                        for d_line in desc_out.splitlines():
-                            if d_line.startswith("summary:"):
-                                desc = d_line.replace("summary:", "").strip().replace("|", "-")
-                                break
-                        md_lines.append(f"| Snap | Sistema/Inicial | {s_name} | {desc} |")
-            except Exception:
-                pass
+                details = f"Versió: {version}" if version else "-"
+                if description:
+                    details += f"; {description}"
+
+                md_lines.append(
+                    f"| APT | Sistema/Inicial | {name} | {details} |"
+                )
+
+            for application in collect_snap_applications():
+                name = application["name"].replace("|", "-")
+                version = application["version"].replace("|", "-")
+                description = application["description"].replace("|", "-")
+
+                details = f"Versió: {version}" if version else "-"
+                if description:
+                    details += f"; {description}"
+
+                md_lines.append(
+                    f"| Snap | Sistema/Inicial | {name} | {details} |"
+                )
+
 
             try:
                 gnome_extensions = collect_gnome_extensions()

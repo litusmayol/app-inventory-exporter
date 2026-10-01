@@ -363,3 +363,160 @@ def collect_flatpak_applications(runner=None):
 
     applications.sort(key=lambda item: item["name"].casefold())
     return applications
+
+
+def collect_apt_packages(runner=None):
+    """Return manually installed APT packages with version and description."""
+    if runner is None:
+        runner = subprocess.run
+
+    try:
+        manual_result = runner(
+            ["apt-mark", "showmanual"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return []
+
+    packages = []
+
+    excluded_prefixes = (
+        "language-pack",
+        "gnome-user-docs",
+        "gdm",
+        "ubuntu-desktop",
+        "linux-",
+        "casper",
+    )
+
+    for package_name in manual_result.stdout.splitlines():
+        package_name = package_name.strip()
+
+        if not package_name or package_name.startswith(excluded_prefixes):
+            continue
+
+        try:
+            metadata_result = runner(
+                [
+                    "dpkg-query",
+                    "-W",
+                    "-f=${Package}\t${Version}\t${Description}\n",
+                    package_name,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except (OSError, subprocess.CalledProcessError):
+            continue
+
+        lines = metadata_result.stdout.splitlines()
+
+        if not lines:
+            continue
+
+        fields = lines[0].split("\t", 2)
+
+        if len(fields) < 3:
+            continue
+
+        name, version, description = (
+            field.strip() for field in fields
+        )
+
+        continuation = [
+            line.strip()
+            for line in lines[1:]
+            if line.strip()
+        ]
+
+        if continuation:
+            description = " ".join([description] + continuation)
+
+        packages.append(
+            {
+                "name": name or package_name,
+                "version": version,
+                "description": description,
+                "source": "APT",
+            }
+        )
+
+    packages.sort(key=lambda item: item["name"].casefold())
+    return packages
+
+
+def collect_snap_applications(runner=None):
+    """Return installed non-base Snap applications with metadata."""
+    if runner is None:
+        runner = subprocess.run
+
+    try:
+        list_result = runner(
+            ["snap", "list"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return []
+
+    applications = []
+
+    excluded_names = {
+        "bare",
+        "gtk-common-themes",
+        "snapd",
+    }
+
+    excluded_prefixes = (
+        "core",
+        "gnome-",
+        "mesa-",
+    )
+
+    lines = list_result.stdout.splitlines()
+
+    for raw_line in lines[1:]:
+        fields = raw_line.split()
+
+        if len(fields) < 2:
+            continue
+
+        name = fields[0]
+        version = fields[1]
+
+        if name in excluded_names or name.startswith(excluded_prefixes):
+            continue
+
+        description = ""
+
+        try:
+            info_result = runner(
+                ["snap", "info", name],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except (OSError, subprocess.CalledProcessError):
+            info_result = None
+
+        if info_result:
+            for info_line in info_result.stdout.splitlines():
+                if info_line.startswith("summary:"):
+                    description = info_line.split(":", 1)[1].strip()
+                    break
+
+        applications.append(
+            {
+                "name": name,
+                "version": version,
+                "description": description,
+                "source": "Snap",
+            }
+        )
+
+    applications.sort(key=lambda item: item["name"].casefold())
+    return applications

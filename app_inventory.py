@@ -8,6 +8,7 @@ from tkinter import ttk, filedialog, messagebox
 import datetime
 
 from inventory_collectors import (
+    collect_flatpak_applications,
     collect_gnome_extensions,
     collect_macos_applications,
     collect_windows_applications,
@@ -368,6 +369,36 @@ class AppInventoryGUI:
                 md_lines.append(
                     f"| GNOME | Error | Error en obtenir extensions GNOME: "
                     f"{error} | - |"
+                )
+
+            try:
+                flatpak_applications = collect_flatpak_applications()
+
+                for application in flatpak_applications:
+                    application_id = application["application_id"].replace(
+                        "|", "-"
+                    )
+                    name = application["name"].replace("|", "-")
+                    version = application["version"].replace("|", "-")
+                    installation = application["installation"].replace(
+                        "|", "-"
+                    )
+
+                    details = f"ID: {application_id}"
+
+                    if version:
+                        details += f"; Versió: {version}"
+
+                    details += f"; Instal·lació: {installation}"
+
+                    md_lines.append(
+                        f"| Flatpak | Flatpak Application | {name} | "
+                        f"{details} |"
+                    )
+            except Exception as error:
+                md_lines.append(
+                    f"| Flatpak | Error | Error en obtenir aplicacions "
+                    f"Flatpak: {error} | - |"
                 )
 
         elif system == "Darwin":

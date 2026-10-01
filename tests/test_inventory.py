@@ -743,3 +743,57 @@ def test_gnome_extension_collector_parses_metadata_after_blank_description_lines
     assert extensions[0]["name"] == "Blur my Shell"
     assert extensions[0]["enabled"] == "No"
     assert extensions[0]["state"] == "INITIALIZED"
+
+
+def test_flatpak_collector_reads_structured_application_output():
+    from inventory_collectors import collect_flatpak_applications
+
+    def fake_runner(command, **kwargs):
+        assert command == [
+            "flatpak",
+            "list",
+            "--app",
+            "--columns=application,name,version,installation",
+        ]
+
+        return type(
+            "Completed",
+            (),
+            {
+                "returncode": 0,
+                "stdout": (
+                    "io.gitlab.news_flash.NewsFlash\t"
+                    "Newsflash\t5.2.5\tsystem\n"
+                    "org.example.Editor\t"
+                    "Example Editor\t1.2\tuser\n"
+                ),
+            },
+        )()
+
+    applications = collect_flatpak_applications(runner=fake_runner)
+
+    assert applications == [
+        {
+            "application_id": "org.example.Editor",
+            "name": "Example Editor",
+            "version": "1.2",
+            "installation": "user",
+            "source": "Flatpak",
+        },
+        {
+            "application_id": "io.gitlab.news_flash.NewsFlash",
+            "name": "Newsflash",
+            "version": "5.2.5",
+            "installation": "system",
+            "source": "Flatpak",
+        },
+    ]
+
+
+def test_flatpak_collector_returns_empty_when_command_is_missing():
+    from inventory_collectors import collect_flatpak_applications
+
+    def missing_runner(command, **kwargs):
+        raise FileNotFoundError
+
+    assert collect_flatpak_applications(runner=missing_runner) == []

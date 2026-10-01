@@ -304,3 +304,62 @@ def _parse_gnome_extension_info(output):
         metadata["description"] = " ".join(description_lines)
 
     return metadata
+
+
+def collect_flatpak_applications(runner=None):
+    """Return installed Flatpak applications."""
+    if runner is None:
+        runner = subprocess.run
+
+    command = [
+        "flatpak",
+        "list",
+        "--app",
+        "--columns=application,name,version,installation",
+    ]
+
+    try:
+        result = runner(
+            command,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return []
+
+    applications = []
+
+    for raw_line in result.stdout.splitlines():
+        line = raw_line.strip()
+
+        if not line:
+            continue
+
+        fields = line.split("\t")
+
+        if len(fields) < 4:
+            fields = line.split(None, 3)
+
+        if len(fields) < 4:
+            continue
+
+        application_id, name, version, installation = (
+            field.strip() for field in fields[:4]
+        )
+
+        if not application_id:
+            continue
+
+        applications.append(
+            {
+                "application_id": application_id,
+                "name": name or application_id,
+                "version": version,
+                "installation": installation or "unknown",
+                "source": "Flatpak",
+            }
+        )
+
+    applications.sort(key=lambda item: item["name"].casefold())
+    return applications
